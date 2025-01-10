@@ -21,12 +21,12 @@ services:
     environment:
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
-      # Mail server configuration for MailHog
-      - MAILER_HOST=mailhog
-      - MAILER_PORT=1025
-      - MAILER_USER=
-      - MAILER_PASSWORD=
-      - MAILER_SENDER=no-reply@affine.local
+      # Mail server configuration (placeholders)
+      - MAILER_HOST=${MAILER_HOST}
+      - MAILER_PORT=${MAILER_PORT}
+      - MAILER_USER=${MAILER_USER}
+      - MAILER_PASSWORD=${MAILER_PASSWORD}
+      - MAILER_SENDER=${MAILER_SENDER}
     restart: unless-stopped
 
   affine_migration:
@@ -77,12 +77,4 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  mailhog:
-    image: mailhog/mailhog
-    container_name: mailhog
-    ports:
-      - '8025:8025' # Web UI for viewing emails
-      - '1025:1025' # SMTP server port
     restart: unless-stopped
