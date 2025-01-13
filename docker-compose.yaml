@@ -1,80 +1,56 @@
-name: affine
+version: '3'
+
 services:
-  affine:
-    image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
-    container_name: affine_server
-    ports:
-      - '${PORT:-3010}:3010'
+  vikunja:
+    image: vikunja/vikunja
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: https://vikunja.jimsgarage.co.uk
+      VIKUNJA_DATABASE_HOST: db:3306
+      VIKUNJA_DATABASE_PASSWORD: changeme
+      VIKUNJA_DATABASE_TYPE: mysql
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_SERVICE_JWTSECRET: dskfj23kkjsdkjsdfjkl3sdfgfsdfhsdfkh3ozxpqzx
+    volumes: 
+      - ./files:/app/vikunja/files
+    networks:
+      - proxy
     depends_on:
-      redis:
+      db:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
-      affine_migration:
-        condition: service_completed_successfully
-    volumes:
-      # custom configurations
-      - ${UPLOAD_LOCATION}:/root/.affine/storage
-      - ${CONFIG_LOCATION}:/root/.affine/config
-    env_file:
-      - .env
-    environment:
-      - REDIS_SERVER_HOST=redis
-      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
-      # Mail server configuration (placeholders)
-      - MAILER_HOST=${MAILER_HOST}
-      - MAILER_PORT=${MAILER_PORT}
-      - MAILER_USER=${MAILER_USER}
-      - MAILER_PASSWORD=${MAILER_PASSWORD}
-      - MAILER_SENDER=${MAILER_SENDER}
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja.entrypoints=http"
+      - "traefik.http.routers.vikunja.rule=Host(`vikunja.jimsgarage.co.uk`)"
+      - "traefik.http.middlewares.vikunja-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.vikunja.middlewares=vikunja-https-redirect"
+      - "traefik.http.routers.vikunja-secure.entrypoints=https"
+      - "traefik.http.routers.vikunja-secure.rule=Host(`vikunja.jimsgarage.co.uk`)"
+      - "traefik.http.routers.vikunja-secure.tls=true"
+      - "traefik.http.routers.vikunja-secure.service=vikunja"
+      - "traefik.http.routers.vikunja.tls.certResolver=cloudflare"
+      - "traefik.http.services.vikunja.loadbalancer.server.port=3456"
+      - "traefik.docker.network=proxy"
 
-  affine_migration:
-    image: ghcr.io/toeverything/affine-graphql:${AFFINE_REVISION:-stable}
-    container_name: affine_migration_job
-    volumes:
-      # custom configurations
-      - ${UPLOAD_LOCATION}:/root/.affine/storage
-      - ${CONFIG_LOCATION}:/root/.affine/config
-    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
-    env_file:
-      - .env
+  db:
+    image: mariadb:10
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      - REDIS_SERVER_HOST=redis
-      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  redis:
-    image: redis
-    container_name: redis
+      MYSQL_ROOT_PASSWORD: supersupersecret 
+      MYSQL_USER: vikunja
+      MYSQL_PASSWORD: changeme
+      MYSQL_DATABASE: vikunja
+    networks:
+      - proxy
+    volumes:
+      - ./db:/var/lib/mysql
+    restart: unless-stopped
     healthcheck:
-      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u vikunja --password=changeme"]
+      interval: 2s
+      start_period: 30s
 
-  postgres:
-    image: postgres:16
-    container_name: postgres
-    volumes:
-      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_DATABASE:-affine}
-      POSTGRES_INITDB_ARGS: '--data-checksums'
-      # you better set a password for you database
-      # or you may add 'POSTGRES_HOST_AUTH_METHOD=trust' to ignore postgres security policy
-      POSTGRES_HOST_AUTH_METHOD: trust
-    healthcheck:
-      test:
-        ['CMD', 'pg_isready', '-U', "${DB_USERNAME}", '-d', "${DB_DATABASE:-affine}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+networks:
+  proxy:
+    external: true
