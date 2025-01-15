@@ -1,34 +1,14 @@
-version: '3'
-
+version: '3.1'
 services:
-  vikunja:
-    image: vikunja/vikunja
-    environment:
-      VIKUNJA_SERVICE_PUBLICURL: https://ill-nellie-hits-1872fb17.koyeb.app
-      VIKUNJA_DATABASE_HOST: db
-      VIKUNJA_DATABASE_PASSWORD: changeme
-      VIKUNJA_DATABASE_TYPE: mysql
-      VIKUNJA_DATABASE_USER: vikunja
-      VIKUNJA_DATABASE_DATABASE: vikunja
-      VIKUNJA_SERVICE_JWTSECRET: dskfj23kkjsdkjsdfjkl3sdfgfsdfhsdfkh3ozxpqzx
-    ports:
-      - 3456:3456
-
+  web:
+    image: odoo:17.0
     depends_on:
-      db:
-        condition: service_healthy
-    restart: unless-stopped
+      - db
+    ports:
+      - "8069:8069"
   db:
-    image: mariadb:10
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    image: postgres:15
     environment:
-      MYSQL_ROOT_PASSWORD: supersecret
-      MYSQL_USER: vikunja
-      MYSQL_PASSWORD: changeme
-      MYSQL_DATABASE: vikunja
-
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u $$MYSQL_USER --password=$$MYSQL_PASSWORD"]
-      interval: 2s
-      start_period: 30s
+      - POSTGRES_DB=postgres
+      - POSTGRES_PASSWORD=odoo
+      - POSTGRES_USER=odoo
